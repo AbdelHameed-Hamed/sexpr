@@ -46,7 +46,7 @@ main :: proc() {
                 }
             }
             for is_alphanumeric(source[j]) do j += 1;
-            append(&tokens, Token { .STRING, source[i:j + 1]});
+            append(&tokens, Token { .IDENTIFIER, source[i:j + 1]});
             i = j;
         }
     }
