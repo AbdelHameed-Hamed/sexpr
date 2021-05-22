@@ -36,7 +36,7 @@ main :: proc() {
             append(&tokens, Token { .STRING, source[i:j + 1]});
             i = j;
         case '_', 'A'..'Z', 'a'..'z':
-            j := i + 1;
+            j := i;
             is_alphanumeric :: proc (c: u8) -> bool {
                 switch c {
                     case '_', 'A'..'Z', 'a'..'z', '0'..'9':
@@ -46,8 +46,10 @@ main :: proc() {
                 }
             }
             for is_alphanumeric(source[j]) do j += 1;
-            append(&tokens, Token { .IDENTIFIER, source[i:j + 1]});
-            i = j;
+            append(&tokens, Token { .IDENTIFIER, source[i:j]});
+            i = j - 1;
+        case:
+            assert(false);
         }
     }
 
