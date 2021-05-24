@@ -1,8 +1,10 @@
 package main
 
 import "core:fmt"
+import "core:container"
 
 Token_Type :: enum {
+    NONE,
     L_PARAN,
     R_PARAN,
     DOT,
@@ -94,14 +96,42 @@ main :: proc() {
         }
     }
 
+    // ToDo: gotta free the memory properly, but honestly too lazy atm. Just let the OS reclaim the memory
+    // once the process exists
     ast: AST;
 
+    current_root := &ast;
+    roots: container.Array(^AST);
+    container.array_init(&roots);
+    defer container.array_delete(roots);
+
     // Parsing
-    for token, i in tokens {
+    for token in tokens {
         fmt.println(token);
+        append(&current_root.children, AST{ token, make([dynamic]AST) });
+
         switch token.type {
         case .L_PARAN:
+            container.array_push_back(&roots, current_root);
+            last_idx := len(current_root.children) - 1;
+            current_root = &current_root.children[last_idx];
         case .R_PARAN:
+            current_root = container.array_pop_back(&roots);
+        case .DOT: // ToDo
+        case .STRING:
+        case .NUMBER:
+        case .SYMBOL:
+        case .NONE: fallthrough;
+        case:
+            fmt.println("Invalid AST");
+            assert(false);
         }
     }
+
+    if (roots.len != 0) {
+        fmt.println("Mismatch in paranthases");
+        assert(false);
+    }
+
+    fmt.println(ast);
 }
