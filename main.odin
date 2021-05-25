@@ -50,7 +50,7 @@ AST :: struct {
 
 main :: proc() {
     // source: string = "(x\":D\" 0123 -42 0.73)";
-    source := "(x (y) () (z))";
+    source := "(x (y) () (z . w) . (v))";
 
     tokens: [dynamic]Token;
     defer delete(tokens);
@@ -110,7 +110,7 @@ main :: proc() {
             return res;
         }
 
-        determine_paran_range_end :: proc(tokens: []Token, start: int) -> int {
+        determine_paran_range_end_offset :: proc(tokens: []Token) -> int {
             scope_depth := 0;
             for token, i in tokens {
                 #partial switch token.type {
@@ -119,7 +119,7 @@ main :: proc() {
                 case .R_PARAN:
                     scope_depth -= 1;
                     if scope_depth == 0 {
-                        return start + i;
+                        return i;
                     } else if scope_depth < 0 {
                         assert(false, "Scope depth is less than 0");
                     }
@@ -138,16 +138,48 @@ main :: proc() {
             return 0;
         }
 
+        parse_dot_rhs :: proc(tokens: []Token, lhs: AST) -> (AST, int) {
+            res := AST{ .PAIR, ".", make([dynamic]AST) };
+            offset := 0;
+            append(&res.children, lhs);
+            if len(tokens) == 0 {
+                assert(false, "The \".\" is a binary operator and is missing a rhs");
+            }
+
+            switch tokens[0].type {
+                case .L_PARAN:
+                    offset = determine_paran_range_end_offset(tokens[:]);
+                    temp_res := parse_list(tokens[1 : offset]);
+                    append(&res.children, temp_res);
+                    // To account for the initial "("
+                    offset += 1;
+                case .R_PARAN: fallthrough;
+                case .DOT:
+                    assert(false, "Invalid rhs for \".\"");
+                case .STRING: fallthrough;
+                case .NUMBER: fallthrough;
+                case .SYMBOL:
+                    append(&res.children, AST{ .ATOM, tokens[0].token, make([dynamic]AST) });
+                    offset = 1;
+            }
+
+            return res, offset;
+        }
+
         for i := 0; i < len(tokens); i += 1 {
             switch tokens[i].type {
             case .L_PARAN:
-                end := determine_paran_range_end(tokens[i:], i);
-                temp_res := parse_list(tokens[i + 1: end]);
+                end_offset := determine_paran_range_end_offset(tokens[i:]);
+                temp_res := parse_list(tokens[i + 1 : i + end_offset]);
                 append(&res.children, temp_res);
-                i += end - i;
+                i += end_offset;
             case .R_PARAN:
                 assert(false, "Invalid: shouldn't be parsing \")\"");
-            case .DOT: // ToDo
+            case .DOT:
+                last_idx := len(res.children) - 1;
+                temp_res, offset := parse_dot_rhs(tokens[i + 1 :], res.children[last_idx]);
+                res.children[last_idx] = temp_res;
+                i += offset;
             case .STRING: fallthrough;
             case .NUMBER: fallthrough;
             case .SYMBOL:
