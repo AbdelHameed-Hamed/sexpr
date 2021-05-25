@@ -82,6 +82,7 @@ main :: proc() {
                 for is_numeric(source[j]) do j += 1;
                 if source[j] == 'e' {
                     j += 1;
+                    if source[j] == '+' || source[j] == '-' { j += 1; }
                     for is_numeric(source[j]) do j += 1;
                 }
             }
@@ -101,8 +102,7 @@ main :: proc() {
     }
 
     parse_list :: proc(tokens: []Token) -> AST {
-        res := AST{};
-        res.type = .LIST;
+        res := AST{ type = .LIST};
         res.value = "()";
         if len(tokens) == 0 {
             res.type = .NIL;
