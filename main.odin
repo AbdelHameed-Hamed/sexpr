@@ -192,6 +192,48 @@ main :: proc() {
         return res;
     }
 
+    AST2 :: struct {
+        type: enum {
+            NIL,
+            ATOM,
+            PAIR,
+        },
+        value: string,
+        children: [dynamic]^AST2,
+    };
+
+    parse_list_iterative :: proc(tokens: [dynamic]Token) -> AST2 {
+        res := AST2{};
+
+        parans: container.Array(rune);
+        container.array_init(&parans);
+        defer container.array_delete(parans);
+
+        current_root := &res;
+        roots: container.Array(^AST2);
+        container.array_init(&roots);
+        defer container.array_delete(roots);
+
+        for token in tokens {
+            switch token.type {
+            case .L_PARAN:
+                container.array_push_back(&parans, '(');
+                container.array_push_back(&roots, current_root);
+                current_root = new(AST2);
+            case .R_PARAN:
+                container.array_pop_back(&parans);
+                current_root = container.array_pop_back(&roots);
+            case .DOT:
+            case .STRING: fallthrough;
+            case .NUMBER: fallthrough;
+            case .SYMBOL:
+            case: assert(false, "Invalid token type");
+            }
+        }
+
+        return res;
+    }
+
     // ToDo: gotta free the memory properly, but honestly too lazy atm. Just let the OS reclaim the memory
     // once the process exists
     res := parse_list(tokens[:]);
