@@ -54,7 +54,7 @@ main :: proc() {
     // source: string = "(x\":D\" 0123 -42 0.73)";
     // source := "(x (y) () (z . w) . (v))";
     // (x . ((y) . (() . ((z . w) . (v)))))
-    source := "(x (y) z)";
+    source := "(x (y . w) (z . (koko wawa)))";
     // source := "(x (y) () (z w))";
 
     tokens: [dynamic]Token;
@@ -221,8 +221,6 @@ main :: proc() {
         defer array_delete(roots);
 
         for i := 0; i < len(tokens); i += 1 {
-            fmt.println(tokens[i]);
-            defer fmt.println();
             switch tokens[i].type {
             case .L_PARAN:
                 current_root = new(AST2);
@@ -240,9 +238,9 @@ main :: proc() {
                 }
                 continue;
             case .R_PARAN:
-                // A bit more nuanced
+                // A bit more nuanced, might need to look into the cases with multiple succeeding ')'s???
                 current_root = array_pop_back(&roots);
-            case .DOT:
+            case .DOT: continue;
             case .STRING: fallthrough;
             case .NUMBER: fallthrough;
             case .SYMBOL:
@@ -250,19 +248,16 @@ main :: proc() {
                 current_root.type = .ATOM;
                 current_root.value = tokens[i].token;
                 previous_root := array_get_ptr(roots, array_len(roots) - 1);
-                fmt.println(previous_root^);
                 append(&previous_root^.children, current_root);
             case: assert(false, "Invalid token type");
             }
-            fmt.println("Doing the pair check");
+
             if i < len(tokens) - 1 && tokens[i + 1].type != .DOT && tokens[i + 1].type != .R_PARAN {
-                fmt.println("Pair found");
                 current_root = new(AST2);
                 current_root.type = .PAIR;
                 current_root.value = "()";
 
                 previous_root := array_get_ptr(roots, array_len(roots) - 1);
-                fmt.println(previous_root^);
                 append(&previous_root^.children, current_root);
 
                 array_push_back(&roots, current_root);
