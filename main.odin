@@ -53,7 +53,9 @@ main :: proc() {
 
     // source: string = "(x\":D\" 0123 -42 0.73)";
     // source := "(x (y) () (z . w) . (v))";
-    source := "(x . y)";
+    // (x . ((y) . (() . ((z . w) . (v)))))
+    source := "(x (y) z)";
+    // source := "(x (y) () (z w))";
 
     tokens: [dynamic]Token;
     defer delete(tokens);
@@ -206,63 +208,68 @@ main :: proc() {
     };
 
     parse_list_iterative :: proc(tokens: [dynamic]Token) -> AST2 {
-        res := AST2{};
+        res: ^AST2;
 
         parans: Array(rune);
         array_init(&parans);
         defer array_delete(parans);
 
-        current_root := &res;
+        current_root: ^AST2;
 
         roots: Array(^AST2);
         array_init(&roots);
         defer array_delete(roots);
 
-        true_roots: Array(^AST2);
-        array_init(&true_roots);
-        defer array_delete(true_roots);
-
-        construct_list_pair :: proc(root: ^AST2, roots: ^Array(^AST2)) -> ^AST2 {
-            root.type = .PAIR;
-            root.value = "()";
-            res := new(AST2);
-            append(&root.children, res);
-            array_push_back(roots, root);
-            return res;
-        }
-
-        for token, i in tokens {
-            switch token.type {
+        for i := 0; i < len(tokens); i += 1 {
+            fmt.println(tokens[i]);
+            defer fmt.println();
+            switch tokens[i].type {
             case .L_PARAN:
-                array_push_back(&parans, '(');
-                array_push_back(&true_roots, current_root);
-                current_root = construct_list_pair(current_root, &roots);
+                current_root = new(AST2);
+                current_root.type = .PAIR;
+                current_root.value = "()";
+
+                if array_len(roots) != 0 {
+                    previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                    append(&previous_root^.children, current_root);
+                }
+                array_push_back(&roots, current_root);
+
+                if res == nil {
+                    res = current_root;
+                }
+                continue;
             case .R_PARAN:
-                array_pop_back(&parans);
-                current_root = array_pop_back(&true_roots);
+                // A bit more nuanced
+                current_root = array_pop_back(&roots);
             case .DOT:
             case .STRING: fallthrough;
             case .NUMBER: fallthrough;
             case .SYMBOL:
+                current_root = new(AST2);
                 current_root.type = .ATOM;
-                current_root.value = token.token;
-                previous_root := array_get(roots, array_len(roots) - 1);
-                if tokens[i + 1].type == .R_PARAN {
-                    append(&previous_root.children, new(AST2));
-                } else if tokens[i + 1].type == .DOT {
-                    current_root = new(AST2);
-                    append(&previous_root.children, current_root);
-                } else {
-                    current_root = new(AST2);
-                    temp := construct_list_pair(current_root, &roots);
-                    append(&previous_root.children, current_root);
-                    current_root = temp;
-                }
+                current_root.value = tokens[i].token;
+                previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                fmt.println(previous_root^);
+                append(&previous_root^.children, current_root);
             case: assert(false, "Invalid token type");
+            }
+            fmt.println("Doing the pair check");
+            if i < len(tokens) - 1 && tokens[i + 1].type != .DOT && tokens[i + 1].type != .R_PARAN {
+                fmt.println("Pair found");
+                current_root = new(AST2);
+                current_root.type = .PAIR;
+                current_root.value = "()";
+
+                previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                fmt.println(previous_root^);
+                append(&previous_root^.children, current_root);
+
+                array_push_back(&roots, current_root);
             }
         }
 
-        return res;
+        return res^;
     }
 
     print_ast :: proc(ast: AST2, indent: int) {
