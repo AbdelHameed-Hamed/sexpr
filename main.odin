@@ -49,8 +49,13 @@ AST :: struct {
 };
 
 main :: proc() {
+    using container;
+
     // source: string = "(x\":D\" 0123 -42 0.73)";
-    source := "(x (y) () (z . w) . (v))";
+    // source := "(x (y) () (z . w) . (v))";
+    // (x . ((y) . (() . ((z . w) . (v)))))
+    source := "(x (y . w) (z . (koko wawa)))";
+    // source := "(x (y) () (z w))";
 
     tokens: [dynamic]Token;
     defer delete(tokens);
@@ -192,9 +197,91 @@ main :: proc() {
         return res;
     }
 
+    AST2 :: struct {
+        type: enum {
+            NIL,
+            ATOM,
+            PAIR,
+        },
+        value: string,
+        children: [dynamic]^AST2,
+    };
+
+    parse_list_iterative :: proc(tokens: [dynamic]Token) -> AST2 {
+        res: ^AST2;
+
+        parans: Array(rune);
+        array_init(&parans);
+        defer array_delete(parans);
+
+        current_root: ^AST2;
+
+        roots: Array(^AST2);
+        array_init(&roots);
+        defer array_delete(roots);
+
+        for i := 0; i < len(tokens); i += 1 {
+            switch tokens[i].type {
+            case .L_PARAN:
+                current_root = new(AST2);
+                current_root.type = .PAIR;
+                current_root.value = "()";
+
+                if array_len(roots) != 0 {
+                    previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                    append(&previous_root^.children, current_root);
+                }
+                array_push_back(&roots, current_root);
+
+                if res == nil {
+                    res = current_root;
+                }
+                continue;
+            case .R_PARAN:
+                // A bit more nuanced, might need to look into the cases with multiple succeeding ')'s???
+                current_root = array_pop_back(&roots);
+            case .DOT: continue;
+            case .STRING: fallthrough;
+            case .NUMBER: fallthrough;
+            case .SYMBOL:
+                current_root = new(AST2);
+                current_root.type = .ATOM;
+                current_root.value = tokens[i].token;
+                previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                append(&previous_root^.children, current_root);
+            case: assert(false, "Invalid token type");
+            }
+
+            if i < len(tokens) - 1 && tokens[i + 1].type != .DOT && tokens[i + 1].type != .R_PARAN {
+                current_root = new(AST2);
+                current_root.type = .PAIR;
+                current_root.value = "()";
+
+                previous_root := array_get_ptr(roots, array_len(roots) - 1);
+                append(&previous_root^.children, current_root);
+
+                array_push_back(&roots, current_root);
+            }
+        }
+
+        return res^;
+    }
+
+    print_ast :: proc(ast: AST2, indent: int) {
+        for i in 0..<indent {
+            fmt.print('\t');
+        }
+        fmt.println(ast.type, ast.value);
+        for child in ast.children {
+            print_ast(child^, indent + 1);
+        }
+    }
+
     // ToDo: gotta free the memory properly, but honestly too lazy atm. Just let the OS reclaim the memory
     // once the process exists
-    res := parse_list(tokens[:]);
+    // res := parse_list(tokens[:]);
+    // fmt.println(res);
 
-    fmt.println(res);
+    res := parse_list_iterative(tokens);
+    print_ast(res, 0);
 }
