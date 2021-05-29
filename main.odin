@@ -54,7 +54,8 @@ main :: proc() {
     // source: string = "(x\":D\" 0123 -42 0.73)";
     // source := "(x (y) () (z . w) . (v))";
     // (x . ((y) . (() . ((z . w) . (v)))))
-    source := "(x (y . w) (z . (koko wawa)))";
+    // source := "(x (y . w) (z . (koko wawa)))";
+    source := "(x (y z) \":D\")";
     // source := "(x (y) () (z w))";
 
     tokens: [dynamic]Token;
@@ -209,10 +210,6 @@ main :: proc() {
 
     parse_list_iterative :: proc(tokens: [dynamic]Token) -> AST2 {
         res: ^AST2;
-
-        parans: Array(rune);
-        array_init(&parans);
-        defer array_delete(parans);
 
         current_root: ^AST2;
 
