@@ -217,25 +217,43 @@ main :: proc() {
         array_init(&roots);
         defer array_delete(roots);
 
+        current_to_skip_tree_levels := 0;
+
+        to_skip_tree_levels: Array(int);
+        array_init(&to_skip_tree_levels);
+        defer array_delete(to_skip_tree_levels);
+
+        construct_pair :: proc(roots: ^Array(^AST2)) -> ^AST2 {
+            current_root := new(AST2);
+            current_root.type = .PAIR;
+            current_root.value = "()";
+
+            if array_len(roots^) != 0 {
+                previous_root := array_get_ptr(roots^, array_len(roots^) - 1);
+                append(&previous_root^.children, current_root);
+            }
+
+            array_push_back(roots, current_root);
+
+            return current_root;
+        }
+
         for i := 0; i < len(tokens); i += 1 {
             switch tokens[i].type {
             case .L_PARAN:
-                current_root = new(AST2);
-                current_root.type = .PAIR;
-                current_root.value = "()";
+                array_push_back(&to_skip_tree_levels, current_to_skip_tree_levels);
+                current_to_skip_tree_levels = 0;
 
-                if array_len(roots) != 0 {
-                    previous_root := array_get_ptr(roots, array_len(roots) - 1);
-                    append(&previous_root^.children, current_root);
-                }
-                array_push_back(&roots, current_root);
+                current_root = construct_pair(&roots);
 
                 if res == nil {
                     res = current_root;
                 }
                 continue;
             case .R_PARAN:
-                // A bit more nuanced, might need to look into the cases with multiple succeeding ')'s???
+                array_resize(&roots, array_len(roots) - current_to_skip_tree_levels);
+                current_to_skip_tree_levels = array_pop_back(&to_skip_tree_levels);
+
                 current_root = array_pop_back(&roots);
             case .DOT: continue;
             case .STRING: fallthrough;
@@ -244,20 +262,16 @@ main :: proc() {
                 current_root = new(AST2);
                 current_root.type = .ATOM;
                 current_root.value = tokens[i].token;
+
                 previous_root := array_get_ptr(roots, array_len(roots) - 1);
                 append(&previous_root^.children, current_root);
             case: assert(false, "Invalid token type");
             }
 
             if i < len(tokens) - 1 && tokens[i + 1].type != .DOT && tokens[i + 1].type != .R_PARAN {
-                current_root = new(AST2);
-                current_root.type = .PAIR;
-                current_root.value = "()";
+                current_to_skip_tree_levels += 1;
 
-                previous_root := array_get_ptr(roots, array_len(roots) - 1);
-                append(&previous_root^.children, current_root);
-
-                array_push_back(&roots, current_root);
+                current_root = construct_pair(&roots);
             }
         }
 
